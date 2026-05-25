@@ -17,7 +17,7 @@ export interface User {
   phone_verified: boolean;
 }
 
-export async function registerUser(email: string, password: string, fullName: string): Promise<User> {
+export async function registerUser(email: string, password: string, fullName: string, edisclosure = false): Promise<User> {
   const existing = await query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
   if (existing.rows.length > 0) throw new AppError('Email already registered', 409);
 
@@ -26,9 +26,12 @@ export async function registerUser(email: string, password: string, fullName: st
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const { rows } = await query<User>(
-    `INSERT INTO users (email, password_hash, full_name, email_verify_token, email_verify_expires)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id, email, full_name, role, identity_level, edisclosure_accepted, phone_verified`,
-    [email.toLowerCase(), passwordHash, fullName, verifyToken, verifyExpires]
+    `INSERT INTO users (email, password_hash, full_name, email_verify_token, email_verify_expires,
+       edisclosure_accepted, edisclosure_accepted_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, email, full_name, role, identity_level, edisclosure_accepted, phone_verified`,
+    [email.toLowerCase(), passwordHash, fullName, verifyToken, verifyExpires,
+     edisclosure, edisclosure ? new Date() : null]
   );
 
   return { ...rows[0], _verifyToken: verifyToken } as any;

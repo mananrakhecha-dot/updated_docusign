@@ -17,7 +17,7 @@ function getTransporter(): nodemailer.Transporter {
   return transporter;
 }
 
-export async function sendVerificationEmail(email: string, name: string, token: string): Promise<void> {
+export async function sendVerificationEmail(email: string, name: string, token: string): Promise<string> {
   const verifyUrl = `${process.env.APP_BASE_URL}/api/auth/verify-email?token=${token}`;
   const html = `
     <h2>Welcome to DocuSign, ${name}!</h2>
@@ -28,7 +28,7 @@ export async function sendVerificationEmail(email: string, name: string, token: 
 
   if (process.env.NODE_ENV === 'development') {
     console.log(`[EMAIL] Verification email to ${email}: ${verifyUrl}`);
-    return;
+    return verifyUrl;
   }
 
   await getTransporter().sendMail({
@@ -37,6 +37,7 @@ export async function sendVerificationEmail(email: string, name: string, token: 
     subject: 'Verify your email address',
     html,
   });
+  return verifyUrl;
 }
 
 export async function sendSigningInvitation(

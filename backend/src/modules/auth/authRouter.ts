@@ -13,7 +13,7 @@ const router = Router();
 
 router.post('/register', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, full_name } = req.body;
+    const { email, password, full_name, edisclosure } = req.body;
     if (!email || !password || !full_name) {
       res.status(400).json({ error: 'email, password, and full_name are required' });
       return;
@@ -22,9 +22,13 @@ router.post('/register', authLimiter, async (req: Request, res: Response, next: 
       res.status(400).json({ error: 'Password must be at least 8 characters' });
       return;
     }
-    const user = await registerUser(email, password, full_name) as any;
-    await sendVerificationEmail(user.email, user.full_name, user._verifyToken);
-    res.status(201).json({ message: 'Registration successful. Please check your email to verify your account.' });
+    const user = await registerUser(email, password, full_name, !!edisclosure) as any;
+    const verifyUrl = await sendVerificationEmail(user.email, user.full_name, user._verifyToken);
+    const response: Record<string, any> = { message: 'Registration successful. Please check your email to verify your account.' };
+    if (process.env.NODE_ENV !== 'production') {
+      response.verifyUrl = verifyUrl;
+    }
+    res.status(201).json(response);
   } catch (err) { next(err); }
 });
 

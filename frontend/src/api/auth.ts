@@ -12,8 +12,8 @@ export interface User {
 }
 
 export const authApi = {
-  register: (email: string, password: string, full_name: string) =>
-    api.post('/auth/register', { email, password, full_name }),
+  register: (email: string, password: string, full_name: string, edisclosure: boolean) =>
+    api.post<{ message: string; verifyUrl?: string }>('/auth/register', { email, password, full_name, edisclosure }),
 
   login: (email: string, password: string) =>
     api.post<{ user: User; accessToken: string }>('/auth/login', { email, password }),
