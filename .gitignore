@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.env.local
+uploads/
+ca-store/*.enc
+backend/cookies.txt

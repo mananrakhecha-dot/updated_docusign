@@ -1,0 +1,7 @@
+{
+  "defaultEnv": "default",
+  "default": {
+    "driver": "pg",
+    "url": { "ENV": "DATABASE_URL" }
+  }
+}
