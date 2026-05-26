@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Draggable from 'react-draggable';
 import { envelopeApi, SignatureField } from '../api/envelopes';
@@ -38,9 +38,18 @@ export function NewEnvelope() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [envelopeId, setEnvelopeId] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [pageCount, setPageCount] = useState(0);
+
+  // Create a local blob URL for the PDF so we can render it during field placement
+  useEffect(() => {
+    if (!pdfFile) { setPdfBlobUrl(null); return; }
+    const url = URL.createObjectURL(pdfFile);
+    setPdfBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pdfFile]);
 
   // Recipients step
   const [recipients, setRecipients] = useState<RecipientForm[]>([
@@ -316,16 +325,27 @@ export function NewEnvelope() {
 
               <div className="text-xs text-gray-500 mb-2">Fields on page {activePage}: {fields.filter(f => f.page_number === activePage).length}</div>
 
-              {/* Mock page canvas */}
+              {/* PDF canvas with real document */}
               <div ref={pageRef} className="relative bg-white border-2 border-gray-300 rounded-lg overflow-hidden"
-                style={{ width: '100%', paddingBottom: '141%' }}>
-                <div className="absolute inset-0 p-2 text-gray-200 text-xs flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-6xl mb-2">📄</div>
-                    <p>Page {activePage} of {pageCount}</p>
-                    <p className="text-xs">Click "Add Field" to place fields</p>
+                style={{ width: '100%', height: '800px' }}>
+                {/* PDF rendered behind the draggable fields */}
+                {pdfBlobUrl ? (
+                  <iframe
+                    src={`${pdfBlobUrl}#page=${activePage}&toolbar=0&navpanes=0`}
+                    className="absolute inset-0 w-full h-full"
+                    style={{ border: 'none', pointerEvents: 'none' }}
+                    title={`Document page ${activePage}`}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-200">
+                    <div className="text-center">
+                      <div className="text-6xl mb-2">📄</div>
+                      <p className="text-sm">Page {activePage} of {pageCount}</p>
+                    </div>
                   </div>
-                </div>
+                )}
+                {/* Transparent overlay — drag targets live here */}
+                <div className="absolute inset-0">
                 {fields.filter(f => f.page_number === activePage).map((field, fi) => (
                   <Draggable
                     key={field.id}
@@ -357,6 +377,7 @@ export function NewEnvelope() {
                     </div>
                   </Draggable>
                 ))}
+                </div>
               </div>
             </div>
 
