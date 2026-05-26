@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Draggable from 'react-draggable';
 import { envelopeApi, SignatureField } from '../api/envelopes';
 import { Layout } from '../components/Layout';
+import { SignatureCaptureModal } from '../components/SignatureCaptureModal';
 import toast from 'react-hot-toast';
 
 type WizardStep = 'upload' | 'recipients' | 'fields' | 'review';
@@ -23,6 +24,7 @@ interface FieldOnPage {
   width: number;
   height: number;
   page_number: number;
+  preview_data?: string | null;
 }
 
 const FIELD_COLORS = ['border-blue-400 bg-blue-50', 'border-purple-400 bg-purple-50', 'border-orange-400 bg-orange-50', 'border-pink-400 bg-pink-50'];
@@ -51,6 +53,10 @@ export function NewEnvelope() {
   const [activeRecipient, setActiveRecipient] = useState(0);
   const [activePage, setActivePage] = useState(1);
   const pageRef = useRef<HTMLDivElement>(null);
+
+  // Signature capture modal
+  const [captureModalOpen, setCaptureModalOpen] = useState(false);
+  const pendingFieldRef = useRef<Omit<FieldOnPage, 'preview_data'> | null>(null);
 
   // Upload + create envelope
   const handleUpload = async () => {
@@ -87,9 +93,9 @@ export function NewEnvelope() {
     } finally { setLoading(false); }
   };
 
-  // Add field to current page
+  // Add field — opens capture modal for signature/initials, places directly for others
   const addField = useCallback(() => {
-    const newField: FieldOnPage = {
+    const base: Omit<FieldOnPage, 'preview_data'> = {
       id: `field-${Date.now()}`,
       field_type: activeFieldType,
       recipient_index: activeRecipient,
@@ -99,8 +105,25 @@ export function NewEnvelope() {
       height: 6,
       page_number: activePage,
     };
-    setFields(f => [...f, newField]);
+    if (activeFieldType === 'signature' || activeFieldType === 'initials') {
+      pendingFieldRef.current = base;
+      setCaptureModalOpen(true);
+    } else {
+      setFields(f => [...f, { ...base, preview_data: null }]);
+    }
   }, [activeFieldType, activeRecipient, activePage]);
+
+  const handleCaptureConfirm = useCallback((base64: string) => {
+    if (!pendingFieldRef.current) return;
+    setFields(f => [...f, { ...pendingFieldRef.current!, preview_data: base64 }]);
+    pendingFieldRef.current = null;
+    setCaptureModalOpen(false);
+  }, []);
+
+  const handleCaptureCancel = useCallback(() => {
+    pendingFieldRef.current = null;
+    setCaptureModalOpen(false);
+  }, []);
 
   // Save fields
   const handleSaveFields = async () => {
@@ -118,6 +141,7 @@ export function NewEnvelope() {
         width: f.width,
         height: f.height,
         field_type: f.field_type,
+        preview_data: f.preview_data ?? null,
       }));
       await envelopeApi.saveFields(envelopeId, fieldPayload);
       toast.success('Fields saved');
@@ -316,16 +340,20 @@ export function NewEnvelope() {
                       ));
                     }}
                   >
-                    <div className={`absolute cursor-move border-2 rounded px-2 py-1 text-xs font-medium select-none ${FIELD_COLORS[field.recipient_index % FIELD_COLORS.length]}`}
+                    <div className={`absolute cursor-move border-2 rounded px-1 py-0.5 text-xs font-medium select-none ${FIELD_COLORS[field.recipient_index % FIELD_COLORS.length]}`}
                       style={{ width: `${field.width}%`, height: `${field.height}%` }}>
                       <div className="flex items-center justify-between">
-                        <span className="truncate">{field.field_type}</span>
-                        <button className="text-red-400 hover:text-red-600 ml-1 text-xs"
-                          onClick={() => setFields(fs => fs.filter(f => f.id !== field.id))}>×</button>
+                        <span className="truncate" style={{ fontSize: '9px' }}>{field.field_type}</span>
+                        <button className="text-red-400 hover:text-red-600 ml-1 text-xs leading-none"
+                          onClick={(e) => { e.stopPropagation(); setFields(fs => fs.filter(f => f.id !== field.id)); }}>×</button>
                       </div>
-                      <div className="text-gray-400 truncate" style={{ fontSize: '9px' }}>
-                        R{field.recipient_index + 1}: {recipients[field.recipient_index]?.full_name?.split(' ')[0] || '?'}
-                      </div>
+                      {field.preview_data ? (
+                        <img src={field.preview_data} alt="sig" className="w-full object-contain" style={{ maxHeight: '60%' }} />
+                      ) : (
+                        <div className="text-gray-400 truncate" style={{ fontSize: '9px' }}>
+                          R{field.recipient_index + 1}: {recipients[field.recipient_index]?.full_name?.split(' ')[0] || '?'}
+                        </div>
+                      )}
                     </div>
                   </Draggable>
                 ))}
@@ -391,6 +419,13 @@ export function NewEnvelope() {
           </div>
         )}
       </div>
+      {captureModalOpen && pendingFieldRef.current && (
+        <SignatureCaptureModal
+          fieldType={pendingFieldRef.current.field_type as 'signature' | 'initials'}
+          onConfirm={handleCaptureConfirm}
+          onCancel={handleCaptureCancel}
+        />
+      )}
     </Layout>
   );
 }

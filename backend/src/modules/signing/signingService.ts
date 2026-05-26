@@ -100,9 +100,13 @@ export async function completeSigningCeremony(
   signatureDataMap: Record<string, string>, // fieldId -> base64 signature PNG
   ipAddress: string,
   userAgent: string,
-  otpCode?: string
+  otpCode?: string,
+  signingIp?: string
 ): Promise<void> {
   const payload = decodeSigningToken(token);
+
+  // Capture signing IP before any other logic
+  const capturedIp = signingIp || ipAddress || 'unknown';
 
   const { rows: recipients } = await query<any>(
     `SELECT er.*, e.subject, e.status as envelope_status
@@ -221,8 +225,8 @@ export async function completeSigningCeremony(
 
   // Step 5 — Update state
   await query(
-    `UPDATE envelope_recipients SET status='SIGNED', signed_at=now(), ip_address=$1, user_agent=$2 WHERE id=$3`,
-    [ipAddress, userAgent, payload.recipientId]
+    `UPDATE envelope_recipients SET status='SIGNED', signed_at=now(), ip_address=$1, user_agent=$2, signing_ip=$3 WHERE id=$4`,
+    [ipAddress, userAgent, capturedIp, payload.recipientId]
   );
 
   await logEvent({
@@ -254,6 +258,13 @@ export async function completeSigningCeremony(
       [payload.envelopeId]
     );
     await logEvent({ envelopeId: payload.envelopeId, eventType: 'envelope_completed' });
+
+    // Fire-and-forget certificate generation (never throws to client)
+    import('./certificateGenerator').then(({ generateCompletionCertificate }) => {
+      generateCompletionCertificate(payload.envelopeId).catch(err =>
+        console.error('[CertGen] Certificate generation failed', { envelopeId: payload.envelopeId, err })
+      );
+    }).catch(() => {});
 
     // Queue completion emails and CoC
     const { rows: allRecipients } = await query<any>(

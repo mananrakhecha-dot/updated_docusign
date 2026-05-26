@@ -99,3 +99,36 @@ export async function sendCompletionEmail(
     html,
   });
 }
+
+export async function sendCompletionCertificateEmail(
+  email: string,
+  name: string,
+  subject: string,
+  envelopeId: string,
+  certBuffer: Buffer
+): Promise<void> {
+  const downloadUrl = `${process.env.FRONTEND_URL}/envelopes/${envelopeId}`;
+  const html = `
+    <h2>Certificate of Completion</h2>
+    <p>Hello ${name},</p>
+    <p>The Certificate of Completion for <strong>${subject}</strong> is attached to this email.</p>
+    <p><a href="${downloadUrl}">View envelope details</a></p>
+  `;
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[EMAIL] Certificate email to ${email} for envelope ${envelopeId} (cert ${certBuffer.length} bytes)`);
+    return;
+  }
+
+  await getTransporter().sendMail({
+    from: '"DocuSign" <noreply@digsign.app>',
+    to: email,
+    subject: `Certificate of Completion: ${subject}`,
+    html,
+    attachments: [{
+      filename: `certificate-${envelopeId}.pdf`,
+      content: certBuffer,
+      contentType: 'application/pdf',
+    }],
+  });
+}

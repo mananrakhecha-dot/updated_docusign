@@ -122,11 +122,24 @@ router.get('/:id/download', requireAuth, async (req: Request, res: Response, nex
 // Download Certificate of Completion
 router.get('/:id/certificate', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { rows } = await query<any>('SELECT completion_cert_path FROM envelopes WHERE id=$1', [req.params.id]);
-    if (!rows[0]?.completion_cert_path) { res.status(404).json({ error: 'Certificate not available yet' }); return; }
-    const buf = readFile(rows[0].completion_cert_path, true);
+    // Try new envelope_documents-based cert first, fall back to legacy completion_cert_path
+    const { rows: certDocs } = await query<any>(
+      `SELECT file_path FROM envelope_documents WHERE envelope_id=$1 AND document_type='certificate' LIMIT 1`,
+      [req.params.id]
+    );
+
+    let filePath: string | undefined = certDocs[0]?.file_path;
+
+    if (!filePath) {
+      const { rows: env } = await query<any>('SELECT completion_cert_path FROM envelopes WHERE id=$1', [req.params.id]);
+      filePath = env[0]?.completion_cert_path;
+    }
+
+    if (!filePath) { res.status(404).json({ error: 'Certificate not available yet' }); return; }
+
+    const buf = readFile(filePath, true);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="certificate-of-completion.pdf"');
+    res.setHeader('Content-Disposition', `attachment; filename="certificate-${req.params.id}.pdf"`);
     res.send(buf);
   } catch (err) { next(err); }
 });

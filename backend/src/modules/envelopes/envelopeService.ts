@@ -83,6 +83,7 @@ export async function saveFields(
     page_number: number;
     x: number; y: number; width: number; height: number;
     field_type: string;
+    preview_data?: string | null;
   }>
 ): Promise<void> {
   const env = await getEnvelopeOrThrow(envelopeId, senderId);
@@ -99,9 +100,9 @@ export async function saveFields(
 
   for (const field of fields) {
     await query(
-      `INSERT INTO signature_fields (envelope_document_id, recipient_id, page_number, x, y, width, height, field_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [field.envelope_document_id, field.recipient_id, field.page_number, field.x, field.y, field.width, field.height, field.field_type]
+      `INSERT INTO signature_fields (envelope_document_id, recipient_id, page_number, x, y, width, height, field_type, preview_data)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [field.envelope_document_id, field.recipient_id, field.page_number, field.x, field.y, field.width, field.height, field.field_type, field.preview_data ?? null]
     );
   }
 }

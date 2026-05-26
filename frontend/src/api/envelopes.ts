@@ -50,6 +50,7 @@ export interface SignatureField {
   width: number;
   height: number;
   field_type: 'signature' | 'initials' | 'date' | 'text';
+  preview_data?: string | null;
 }
 
 export const envelopeApi = {

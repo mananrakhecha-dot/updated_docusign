@@ -38,8 +38,9 @@ router.post('/:token/complete', async (req: Request, res: Response, next: NextFu
   try {
     const ip = req.ip || req.socket?.remoteAddress || '';
     const ua = req.headers['user-agent'] || '';
+    const signingIp = (req.headers['x-forwarded-for'] as string || ip || 'unknown').split(',')[0].trim();
     const { signature_data, otp_code } = req.body;
-    await completeSigningCeremony(req.params.token, signature_data || {}, ip, ua, otp_code);
+    await completeSigningCeremony(req.params.token, signature_data || {}, ip, ua, otp_code, signingIp);
     res.json({ message: 'Document signed successfully' });
   } catch (err) { next(err); }
 });
